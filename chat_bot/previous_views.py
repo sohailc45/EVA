@@ -33,26 +33,13 @@ import copy
 # from chat_bot.services import initialize_service, end_service, get_or_create_session, unified_query
 from chat_bot.services import unified_query
 
-
 #############################################################################
-import logging
-from logging.handlers import RotatingFileHandler
-# Setup logging
-log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-log_file = 'chathistory_api.log'
-log_handler = RotatingFileHandler(log_file, maxBytes=1024 * 1024 * 100, backupCount=500)
-log_handler.setFormatter(log_formatter)
-log_handler.setLevel(logging.INFO)
 
-api_logger = logging.getLogger(__name__)
-api_logger.setLevel(logging.INFO)
-api_logger.addHandler(log_handler)
-
-#############################################################################
-practices_dictionary = {} 
+customer_id = None
 l = []
 is_sent = False
 is_recieved = False
+path_var = None
 
 #############################################################################
 # from langfuse.decorators import observe
@@ -123,28 +110,18 @@ prompt = PromptTemplate(
   )
 
 
-# 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
-
-# llm = HuggingFaceEndpoint(
-#     repo_id="https://j1t7my9b1s4ixuzt.us-east-1.aws.endpoints.huggingface.cloud",  huggingfacehub_api_token="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"
-# )
-# 1
-# api_url = "https://j1t7my9b1s4ixuzt.us-east-1.aws.endpoints.huggingface.cloud"
-# headers = {
-#     "Authorization": "Bearer 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",  
-#     "Content-Type": "application/json"
-# }
 
 
 llm = HuggingFaceEndpoint(
-    repo_id="https://wx2g34iuksazqm7e.us-east-1.aws.endpoints.huggingface.cloud",  huggingfacehub_api_token="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"
+    repo_id="https://j1t7my9b1s4ixuzt.us-east-1.aws.endpoints.huggingface.cloud",  huggingfacehub_api_token="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"
 )
-
-api_url = "https://wx2g34iuksazqm7e.us-east-1.aws.endpoints.huggingface.cloud"
+1
+api_url = "https://j1t7my9b1s4ixuzt.us-east-1.aws.endpoints.huggingface.cloud"
 headers = {
-    "Authorization": "Bearer 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",  
+    "Authorization": "Bearer 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",  
     "Content-Type": "application/json"
 }
+
  
 from langfuse.callback import CallbackHandler 
 import csv
@@ -319,29 +296,23 @@ def query_chroma_and_generate_response(query):
     #     return "Failed to connect to the vector database."
 
     ######################################################################################
-
-    dictionary = ast.literal_eval(query)
-    path_var = dictionary["practice"]
-
-    path_list = path_var.split('/')
-    if "hheyecare" in path_list:
-        product = "Practice1"   
-    elif "sebia" in path_list:
-        product = "Practice2"
-    else:
+    product = path_var.replace('/','')
+    if product == "practice1":
         product = "Practice1"
-    # if product == "practice3":
-    #     product = "Recipes"
-    # if product == "":
-    #     product = "Practice1"
+    if product == "practice2":
+        product = "Practice2"
+    if product == "practice3":
+        product = "Recipes"
+    if product == "practice4":
+        product = "Practice1"
     vid_src = 1
     pdf_src = 1
     qna_src = 1
     k = 5 
     user_id = 123
-    
+    dictionary = ast.literal_eval(query)
     query =  dictionary["query"]
-    result = unified_query(query, product, vid_src, pdf_src, k, user_id)
+    result = unified_query(query, session, product, vid_src, pdf_src, k, user_id)
     response = result["Answer"]
     # response = identify_intent_practice_question(query, response)
 
@@ -363,7 +334,7 @@ def get_greeting_response(user_input):
     modelPromptForAppointment = f"""
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-            You are a helpful Eyecare assistant for Eye care Practices. Start with a simple greeting and assist the user related to appointment and Do not anything from your end.            <|eot_id|><|start_header_id|>user<|end_header_id|>
+            You are a helpful Eyecare assistant for MaximCaye Care. Start with a simple greeting and assist the user related to appointment and Do not anything from your end.            <|eot_id|><|start_header_id|>user<|end_header_id|>
 
             {user_input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     """
@@ -425,68 +396,21 @@ def get_greeting_response(user_input):
     return data
 get_greeting_response.return_direct=True
 
-#############################################################################################################
-practices_dictionary = {} 
 
-def get_practice_credentials(bot_id):
-    
-    # API endpoint
-    url = "https://aiassistant.eyeclinic.ai:444/VendorsAPI/GetVendorsCredentialsFromBotID"
 
-    # Define query parameters
-    params = {
-        "BotID": bot_id 
-    }
-
-    # Send a GET request with parameters
-    response = requests.get(url, params=params)
-
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Parse the response JSON if applicable
-        return response.status_code , response.json()
-    else:
-        return response.status_code , response.reason
-
-from chat_bot.get_practices import PracticeDetails
-
-def get_auth_maximEyes_token(path):
-    practice = path.split('/')[1]
-    bot_id = path.split('/')[-1]
-    if practice not in  practices_dictionary:
-        print(True)
-        # call api for the credentiasl
-        status , cred = get_practice_credentials(bot_id)
-        if status == 200:
-            # create an object
-            obj = PracticeDetails(cred)
-        else:
-            print(status,cred)
-        prac_obj = obj.l
-        practices_dictionary.update({f"{practice}":prac_obj})  
-        return get_practice_token(practice)
-    else:
-        return get_practice_token(practice)
-
-#############################################################################################################
-
-def get_auth_token(path) -> str:
+def get_auth_token() -> str:
     """
     Get authentication token using vendor and account credentials.
     """
     print("Get authentication token")
     auth_url = "https://iochatbot.maximeyes.com/api/v2/account/authenticate"
-    # data = json.loads(request.body.decode('utf-8'))
-    # path_var = data.get("path",'')
-    path_var = path
-
    
     # auth_payload = { "VendorId": "e59ec838-2fc5-4639-b761-78e3ec55176c", "VendorPassword": "password@123", "AccountId": "chatbot1", "AccountPassword": "sJ0Y0oniZb6eoBMETuxUNy0aHf6tD6z3wynipZEAxcg=" }
     print("0"*100)
     print(path_var)
     print("0"*100)
 
-    if path_var == "/hheyecare/g7er" or path_var=="/hheyecare/3gs5" or path_var == "/practice/1":
+    if path_var == "/practice1" or path_var == "/practice/1":
         auth_payload = { 
                         "VendorId": "e59ec838-2fc5-4639-b761-78e3ec55176c", 
                         "VendorPassword": "password@123", 
@@ -496,11 +420,11 @@ def get_auth_token(path) -> str:
         print("0"*100)
         print(auth_payload)
         print("0"*100)
-    elif path_var == "/sebia/sh6d" or path_var == "/practice/2":
-         auth_payload = {
+    elif path_var == "/practice2" or path_var == "/practice/2":
+        auth_payload = {
                         "VendorId": "e59ec838-2fc5-4639-b761-78e3ec55176c",
                         "VendorPassword": "password@123",
-                        "AccountId": "chatbot2",
+                        "AccountId": "chatbotqa",
                         "AccountPassword": "sJ0Y0oniZb6eoBMETuxUNy0aHf6tD6z3wynipZEAxcg="
                         }
         
@@ -662,19 +586,9 @@ generate_response.return_direct=True
 
 
 @tool
-def get_locations(data):
+def get_locations(token):
     """Get the list of locations for booking appointments and require FirstName, LastName, DateOfBirth, Email, PhoneNumber and PreferredDateOrTime to go further"""
-    ####################################################
-    data = json.loads(data)
-
-    path = data.get("path")
-    token=get_auth_token(path)
-    
-    # print("ssdfff",data)
-
-    # provider_id = data.get("provider_id")
-    # location_id = data.get("location_id")
-    ####################################################
+    token=get_auth_token()
     print('token++++++++++++++++++++++++++++++=================================')
     headers = {
         'Content-Type': 'application/json',
@@ -708,16 +622,12 @@ get_locations.return_direct=True
 @tool
 def get_providers(location_id):
     """Get the list of providers for a specific location"""
-    
-    print('location_id-',location_id)
-    match = re.search(r'\{.*\}', location_id)
-
-    data = json.loads(location_id)
-    path = data.get("path")
-    token=get_auth_token(path)
+    token=get_auth_token()
     headers = {
         'Content-Type': 'application/json',
         'apiKey': f'bearer {token}'}
+    print('location_id-',location_id)
+    match = re.search(r'\{.*\}', location_id)
     
     json_string = match.group(0)
     location_data = json.loads(json_string)
@@ -755,14 +665,11 @@ def get_appointment_reasons(location_id_provider_id):
     """Get the list of appointment reasons for a specific provider and location"""
     print("efjawkjk")
 
-    
-
-    data = json.loads(location_id_provider_id)
-    path = data.get("path")
-
     headers = {
         'Content-Type': 'application/json',
-        'apiKey': f'bearer {get_auth_token(path)}'}
+        'apiKey': f'bearer {get_auth_token()}'}
+
+    data = json.loads(location_id_provider_id)
     print("ssdfff",data)
 
     provider_id = data.get("provider_id")
@@ -799,17 +706,14 @@ get_appointment_reasons.return_direct=True
 @tool
 def get_open_slots(id):
     """Get the list of open slots based on the given reason ID and other parameters."""
-    
-    # preferred = prefred_date_time_fun(prefred_date_time)
-    # print("prefred date time",preferred)
-    data = json.loads(id)  # Assuming user_input is a JSON string
-    path = data.get("path")
-    token=get_auth_token(path)
+    token=get_auth_token()
     print("rfesf",id)
     headers = {
         'Content-Type': 'application/json',
         'apiKey': f'bearer {token}'}
-
+    # preferred = prefred_date_time_fun(prefred_date_time)
+    # print("prefred date time",preferred)
+    data = json.loads(id)  # Assuming user_input is a JSON string
     preferred_date_time = data.get("preferred_date_time")
     location_id = data.get("location_id")
     reason_id = data.get("reason_id")
@@ -847,7 +751,7 @@ get_open_slots.return_direct=True
 @tool
 def sndotp(data):
     """to send the otp for confirmation"""
-    
+    token=get_auth_token()
     print(data)
     # data=data.replace("\'", "\"")
     # data = json.loads(data)
@@ -855,9 +759,6 @@ def sndotp(data):
         # if True:
             # Attempt to parse as JSON
     data = json.loads(data)
-
-    path = data.get("path")
-    token=get_auth_token(path)
         # else json.JSONDecodeError:
             # If JSON parsing fails, assume it is in key-value pair format
             # try:
@@ -908,19 +809,13 @@ def book_appointment(data):
     (open_slot_id,preferred_date_time,reason_id,FirstName,LastName,DOB,PhoneNumber,Email) 
     and  first we need to get these (open_slot_id,preferred_date_time,reason_id,FirstName,LastName,DOB,PhoneNumber,Email) values from other tools.
       """
-    
-    
-    print("ddfnzn",data)
-    data = json.loads(data)
-
-    path = data.get("path")
-    token=get_auth_token(path)
-    # token=get_auth_token()
-
+    token=get_auth_token()
     headers = {
         'Content-Type': 'application/json',
         'apiKey': f'bearer {token}'}
-
+    print("ddfnzn",data)
+    data = json.loads(data)
+    
     open_slot_id = data.get("open_slot_id")
     from_date = data.get("preferred_date_time")
     reason_id = data.get("reason_id")
@@ -1201,7 +1096,6 @@ def handle_user_input(request,user_input,history,practice):
     data = json.loads(request.body.decode('utf-8'))
     user_input = data.get('input', '')
     session_id = data.get('session_id', '')
-    path = data.get("path")
     request.session[f"step{session_id}"]=UserProfile.objects.get(session_id=session_id).state
     print(request.session[f"step{session_id}"],'selected state -----',session_id)
     
@@ -1225,9 +1119,9 @@ def handle_user_input(request,user_input,history,practice):
             tool_args=", ".join([str(t.args) for t in tools])
           
             try:
-                result=agent_executor.invoke({"input": {"user_input":user_input,"practice":practice},'tools':tools,"tool_names":Tools_names,"tool_description":tool_description,'tool_args':tool_args,'agent_scratchpad':history,"practice":practice}, {"callbacks": [langfuse_handler,handler_1, handler_2]})
+                result=agent_executor.invoke({"input": user_input,'tools':tools,"tool_names":Tools_names,"tool_description":tool_description,'tool_args':tool_args,'agent_scratchpad':history,'practice':practice}, {"callbacks": [langfuse_handler,handler_1, handler_2]})
             except:
-                result=agent_executor.invoke({"input": {"user_input":user_input,"practice":practice},'tools':tools,"tool_names":Tools_names,"tool_description":tool_description,'tool_args':tool_args,'agent_scratchpad':history,"practice":practice}, {"callbacks": [langfuse_handler,handler_1, handler_2]})
+                result=agent_executor.invoke({"input": user_input,'tools':tools,"tool_names":Tools_names,"tool_description":tool_description,'tool_args':tool_args,'agent_scratchpad':history,'practice':practice}, {"callbacks": [langfuse_handler,handler_1, handler_2]})
  
            
             logger.info(result)
@@ -1333,7 +1227,6 @@ def handle_user_input(request,user_input,history,practice):
                         f"Is this information correct? (yes/no)"
                     )
                     request.session[f"step{session_id}"] = "confirmation"
-                    UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
                     return confirmation_message
             else:
                 
@@ -1365,7 +1258,7 @@ def handle_user_input(request,user_input,history,practice):
                     "tools": [sndotp],
                     "tool_names": "sndotp",
                     "tool_description": sndotp.description,
-                    "tool_args": json.dumps({"FirstName": user_data.FirstName,"LastName": user_data.LastName,"PhoneNumber": user_data.PhoneNumber,"DOB": user_data.DateOfBirth,"Email": user_data.Email , "path":path}),                
+                    "tool_args": json.dumps({"FirstName": user_data.FirstName,"LastName": user_data.LastName,"PhoneNumber": user_data.PhoneNumber,"DOB": user_data.DateOfBirth,"Email": user_data.Email}),                
                     "agent_scratchpad": history,
                     "practice":practice
 
@@ -1376,18 +1269,17 @@ def handle_user_input(request,user_input,history,practice):
                     "tools": [sndotp],
                     "tool_names": "sndotp",
                     "tool_description": sndotp.description,
-                    "tool_args": json.dumps({"FirstName": user_data.FirstName,"LastName": user_data.LastName,"PhoneNumber": user_data.PhoneNumber,"DOB": user_data.DateOfBirth,"Email": user_data.Email , "path":path}),                
+                    "tool_args": json.dumps({"FirstName": user_data.FirstName,"LastName": user_data.LastName,"PhoneNumber": user_data.PhoneNumber,"DOB": user_data.DateOfBirth,"Email": user_data.Email}),                
                     "agent_scratchpad": history,
                     "practice":practice
                     })
                 
             #######################################################################################
 
-            api_getCustomer_id(request , user_data.FirstName,user_data.LastName,user_data.DateOfBirth,user_data.PhoneNumber,user_data.Email)
+            api_getCustomer_id(user_data.FirstName,user_data.LastName,user_data.DateOfBirth,user_data.PhoneNumber,user_data.Email)
 
             #######################################################################################
             request.session[f"step{session_id}"] = "otp_verification"
-            UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
             result=" Please enter the OTP to proceed."
             result=transform_input(result)
             return result
@@ -1407,13 +1299,12 @@ def handle_user_input(request,user_input,history,practice):
                     "tools": [sndotp],
                     "tool_names": "sndotp",
                     "tool_description": sndotp.description,
-                    "tool_args": json.dumps({"FirstName": user_data.FirstName,"LastName": user_data.LastName,"PhoneNumber": user_data.PhoneNumber,"DOB": user_data.DateOfBirth,"Email": user_data.Email , "path":path}),                
+                    "tool_args": json.dumps({"FirstName": user_data.FirstName,"LastName": user_data.LastName,"PhoneNumber": user_data.PhoneNumber,"DOB": user_data.DateOfBirth,"Email": user_data.Email}),                
                     "agent_scratchpad": " ",
                      "practice":practice
                     })
             
                 request.session[f"step{session_id}"] = "otp_verification"
-                UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
                 return f" Please enter the OTP to proceed."
             elif intent.lower().strip()=='incorrect':  
                 result="What would you like to edit?(FirstName, LastName, DateOfBirth, PhoneNumber, Email, or PreferredDateOrTime)."
@@ -1492,7 +1383,6 @@ def handle_user_input(request,user_input,history,practice):
             f"Is this information correct? (yes/no)"
         )
         request.session[f"step{session_id}"] = "confirmation"
-        UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
         return confirmation_message
  
     elif request.session[f"step{session_id}"] == "otp_verification":
@@ -1519,7 +1409,7 @@ def handle_user_input(request,user_input,history,practice):
  
         headers = {
             'Content-Type': 'application/json',
-            'apiKey': f'bearer {get_auth_token(path)}'
+            'apiKey': f'bearer {get_auth_token()}'
         }
  
         try:
@@ -1533,7 +1423,6 @@ def handle_user_input(request,user_input,history,practice):
             validation_result = validate_otp_response.json()
             if validation_result.get("Isvalidated"):
                 request.session[f"step{session_id}"] = "confirmed_otp"
-                UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
                 # Fetch locations after OTP confirmation
                 print("reeeeeesgkndksznk")
                 result = agent_executor.invoke({
@@ -1541,8 +1430,7 @@ def handle_user_input(request,user_input,history,practice):
                     "tools": [get_locations],
                     "tool_names": "get_locations",
                     "tool_description": get_locations.description,
-                    # "tool_args": {},
-                    "tool_args": json.dumps({"path":path}),
+                    "tool_args": {},
                     "agent_scratchpad": history,
                     "practice":practice
                 })
@@ -1551,8 +1439,6 @@ def handle_user_input(request,user_input,history,practice):
                 request.session[f"locations{session_id}"] = locations
                 UserProfile.objects.filter(session_id=session_id).update(locations=locations)
                 request.session[f"step{session_id}"] = "location_selection"
-                UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
-                
                 return locations
                
             else:
@@ -1584,7 +1470,7 @@ def handle_user_input(request,user_input,history,practice):
                     "tools": [get_providers],
                     "tool_names": "get_providers",
                     "tool_description": get_providers.description,
-                    "tool_args": json.dumps({"location_id": location_id, "path":path}),
+                    "tool_args": json.dumps({"location_id": location_id}),
                     "agent_scratchpad": history,
                     "practice":practice
                 })
@@ -1601,7 +1487,6 @@ def handle_user_input(request,user_input,history,practice):
        
                 request.session[f"providers{session_id}"] = providers
                 UserProfile.objects.filter(session_id=session_id).update(providers=providers)
-                UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
                 return providers
             else:
                 return "Invalid Location ID. Please enter a Location ID from the list provided."
@@ -1633,7 +1518,7 @@ def handle_user_input(request,user_input,history,practice):
                     "tools": [get_appointment_reasons],
                     "tool_names": "get_appointment_reasons ",
                     "tool_description": get_appointment_reasons.description,
-                    "tool_args": json.dumps({"provider_id": provider_id, "location_id": location_id, "path":path}),
+                    "tool_args": json.dumps({"provider_id": provider_id, "location_id": location_id}),
                     #  "tool_args":get_appointment_reasons.args,
                     "agent_scratchpad": history,
                     "practice":practice
@@ -1646,7 +1531,6 @@ def handle_user_input(request,user_input,history,practice):
                 request.session[f"step{session_id}"] = "appointment_reason_selection"
                 request.session[f"appointment_reasons{session_id}"] = appointment_reasons
                 UserProfile.objects.filter(session_id=session_id).update(appointment_reasons=appointment_reasons)
-                UserProfile.objects.filter(session_id=session_id).update(state=request.session[f"step{session_id}"])
                 return appointment_reasons
  
             else:
@@ -1669,7 +1553,7 @@ def handle_user_input(request,user_input,history,practice):
                 "tools": [get_open_slots],
                 "tool_names": "get_open_slots",
                 "tool_description": get_open_slots.description,
-                "tool_args": json.dumps({"preferred_date_time": preferred_date_time, "location_id": location_id, "reason_id": appointment_reason_id, "provider_id": provider_id, "path":path}),
+                "tool_args": json.dumps({"preferred_date_time": preferred_date_time, "location_id": location_id, "reason_id": appointment_reason_id, "provider_id": provider_id}),
                 "agent_scratchpad": history,
                 "practice":practice
             })
@@ -1707,7 +1591,7 @@ def handle_user_input(request,user_input,history,practice):
                     "tools": [book_appointment],
                     "tool_names": "book_appointment",
                     "tool_description": book_appointment.description,
-                    "tool_args": json.dumps({"location_id": location_id, "provider_id": provider_id, "reason_id": appointment_reason_id, "open_slot_id": open_slot_id,'FirstName' :first_name,'LastName' :last_name,'DOB' :DOB,'preferred_date_time': preferred_date_time,'PhoneNumber' :PhoneNumber,'Email':Email, "path":path}),
+                    "tool_args": json.dumps({"location_id": location_id, "provider_id": provider_id, "reason_id": appointment_reason_id, "open_slot_id": open_slot_id,'FirstName' :first_name,'LastName' :last_name,'DOB' :DOB,'preferred_date_time': preferred_date_time,'PhoneNumber' :PhoneNumber,'Email':Email}),
                     "agent_scratchpad": history,
                     "practice":practice
                 })
@@ -1745,136 +1629,42 @@ def get_chat_history( session_id):
         formatted_history += f"User: {chat.user_input}\nBot: {chat.bot_response}\n"
     return formatted_history
 
-#########################################################################################
-# def home(request):
-#     global path_var
-#     path_var = request.path
-#     request.session[f'session_id1'] = str(uuid.uuid4())
-#     session_id=request.session[f'session_id1'] 
-    
-#     guest_username = request.session.get('guest_username', 'Guest')
-   
-#     username = guest_username
-#     return render(request, "test.html",{'session_id':session_id})
-
-# def home_practice(request,id):
-#     print(type(id))
-#     # global path_var
-#     path = request.path
-#     # global token
-#     token = get_practice_token(request)
-#     # request.session[f'token'] = token
-#     user_id = "5"
-#     customer_id = "0"
-#     request.session[f'session_id1'] = str(uuid.uuid4())
-#     session_id=request.session[f'session_id1'] 
-#     available_practices=[1,2,3,4,"g7er","3gs5","sh6d"]
-#     if id not in available_practices:
-#         return HttpResponse(f"The Practice {id} is not available")
-#     print("Thdxgffffxf",id)
-#     return render(request, "test.html",{'session_id':session_id,'practice_id':id,"token":token ,'path':path ,'customer_id':customer_id ,'user_id':user_id})
-
-###############################################################################################################################
-
-import os
-import requests
-
-def fetch_and_save_html(api_url, file_name):
-    try:
-        # Get the current working directory
-        # current_dir = os.getcwd()
-        current_dir = "\\".join(os.getcwd().split('\\')[0:-1])
-
-        # Define the path to the templates directory
-        templates_dir = os.path.join(current_dir, 'templates')
-
-        # Create the templates directory if it doesn't exist
-        if not os.path.exists(templates_dir):
-            os.makedirs(templates_dir)
-
-        # Define the full file path in the templates directory
-        file_path = os.path.join(templates_dir, file_name)
-
-        # Check if the file already exists
-        if os.path.exists(file_path):
-            print(f"File '{file_name}' already exists in the templates directory. Skipping download.")
-            return
-
-        # Fetch the HTML file from the API
-        response = requests.get(api_url)
-        response.raise_for_status()  # Raise an error for bad responses
-
-        # HTML content from the API
-        html_content = response.text
-
-        # Write the HTML content to the file
-        with open(file_path, 'w', encoding='utf-8') as file:
-            file.write(html_content)
-
-        print(f"HTML file saved at {file_path}")
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching HTML from API: {e}")
-
-def authenticate_practice(bot_id):
-    
-    # API endpoint
-    url = "https://aiassistant.eyeclinic.ai:444/VendorsAPI/CheckBotExists"
-
-    # Define query parameters
-    params = {
-        "BotID": bot_id 
-    }
-
-    # Send a GET request with parameters
-    response = requests.get(url, params=params)
-
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Parse the response JSON if applicable
-        data = response.json()
-        return response.status_code ,data['isBotExists'],data['defaultTheme']
-    else:
-        return response.status_code ,response.status_code , response.reason
-    
-
-def home_practice(request,id):
-    print(type(id))
-    path = request.path
-    token = get_auth_maximEyes_token(path)
-    user_id = "5"
-    customer_id = "0"
+#########################################################################################33
+def home(request):
+    global path_var
+    path_var = request.path
     request.session[f'session_id1'] = str(uuid.uuid4())
     session_id=request.session[f'session_id1'] 
-    status_code , flag , file_name = authenticate_practice(id)
-    if status_code == 200:
-        if flag == True:
-            return render(request, f"{file_name}",{'session_id':session_id,'practice_id':id,"token":token ,'path':path ,'customer_id':customer_id ,'user_id':user_id})
-        else:
-            return HttpResponse(f"The Practice {id} is not available")
-    else:
-        return HttpResponse(f"{status_code} , {file_name}")
-
-###############################################################################################################################
-
-
-# def home_dynamic(request):
-#     global path_var
-#     path_var = request.path
-#     request.session[f'session_id1'] = str(uuid.uuid4())
-#     session_id=request.session[f'session_id1'] 
-#     return render(request, "home_dynamic.html",{'session_id':session_id})
-# def home2(request):
-#     global path_var
-#     path_var = request.path
-#     request.session[f'session_id1'] = str(uuid.uuid4())
-#     session_id=request.session[f'session_id1'] 
-#     return render(request, "test.html",{'session_id':session_id})
+    return render(request, "test.html",{'session_id':session_id})
+def home_practice(request,id):
+    print(type(id))
+    global path_var
+    path_var = request.path
+    request.session[f'session_id1'] = str(uuid.uuid4())
+    session_id=request.session[f'session_id1'] 
+    available_practices=[1,2,3,4]
+    if id not in available_practices:
+        return HttpResponse(f"The Practice {id} is not available")
+    print("Thdxgffffxf",id)
+    return render(request, "test.html",{'session_id':session_id,'practice_id':id})
+def home_dynamic(request):
+    global path_var
+    path_var = request.path
+    request.session[f'session_id1'] = str(uuid.uuid4())
+    session_id=request.session[f'session_id1'] 
+    return render(request, "home_dynamic.html",{'session_id':session_id})
+def home2(request):
+    global path_var
+    path_var = request.path
+    request.session[f'session_id1'] = str(uuid.uuid4())
+    session_id=request.session[f'session_id1'] 
+    return render(request, "test.html",{'session_id':session_id})
 
 ##################################################################################################################
 
 
-def chat_recieved(usermessage , sessionid , customer_id):
+def chat_recieved(usermessage , sessionid ):
+  
     message = ""
     if usermessage:
         message = usermessage
@@ -1887,12 +1677,11 @@ def chat_recieved(usermessage , sessionid , customer_id):
             "moduleName":sessionid,
             "isSent":is_sent,
             "isReceived":is_recieved,
-            # "customerId": str(customer_id) if customer_id!=None else  "0",
-            "customerId": str(customer_id),
+            "customerId": str(customer_id) if customer_id!=None else  "0",
             "LastChatSource":"WebChat"
         })
 
-def chat_sent(response, sessionid , customer_id):
+def chat_sent(response, sessionid ):
     message = ""
     if response:
         message = response
@@ -1905,31 +1694,25 @@ def chat_sent(response, sessionid , customer_id):
             "moduleName":sessionid,
             "isSent":is_sent,
             "isReceived":is_recieved,
-            # "customerId": str(customer_id) if customer_id!=None else  "0",
-            "customerId": str(customer_id),
+            "customerId": str(customer_id) if customer_id!=None else  "0",
             "LastChatSource":"WebChat"
         })
 
 
-def chat_history_api(path_var , token):
+def chat_history_api():
 
     # The URL of the API you want to call
     # url = "https://chatbotadmin.maximeyes.com:444/Chat" 
-    url = "https://chatbotadmin.maximeyes.com:444/ChatAPI/SaveChat"
-
-    p = path_var.split('/')
-    bot_id = p[-1]
-
-    headers = {
-                    "Authorization" : f"Bearer {token}",
-                    "chatbotid" : bot_id
-              }
+    url = "https://chatbotadminapi2.maximeyes.com:444/ChatAPI/SaveChat"
 
     # The list you want to send
     data = copy.deepcopy(l)
     l.clear()
-    # api_logger.info("data sent is ",data,"token = ",token,"\npractice = ",path_var)
-    api_logger.info(f"chat_history_api(): data sent is {data}\n{headers}\n{bot_id}")
+
+    # headers = {
+    # 'Content-Type': 'application/json',
+    # 'apiKey': f'bearer {token}'}
+
     # Making the POST request
     response = requests.post(url, json=data , headers=headers)
 
@@ -1946,25 +1729,12 @@ def chat_history_api(path_var , token):
 
 
 
-def api_getCustomer_id(request,firstName,lastName,dob,phoneNumber,email):
-    # global customer_id
-
-    data = json.loads(request.body.decode('utf-8'))
-    path_var = data.get('path', '')
-    token = data.get('token','')
-    tab_id = data.get('tab_id', '')
+def api_getCustomer_id(firstName,lastName,dob,phoneNumber,email):
+    global customer_id
     print("PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP")
     print(firstName,lastName,dob,phoneNumber,email)
     # The URL of the API you want to call
-    url = "https://chatbotadmin.maximeyes.com:444/ChatAPI/GetCustomerIdFromDetails" 
-
-    p = path_var.split('/')
-    bot_id = p[-1]
-
-    headers = {
-                    "Authorization" : f"Bearer {token}",
-                    "chatbotid" : bot_id
-              }
+    url = "https://chatbotadminapi2.maximeyes.com:444/ChatAPI/GetCustomerIdFromDetails" 
     
     # The list you want to send
     data = {
@@ -1976,8 +1746,7 @@ def api_getCustomer_id(request,firstName,lastName,dob,phoneNumber,email):
             }
 
     # Making the POST request
-    # response = requests.post(url, json=data , headers=headers)
-    response = requests.post(url, json=data , headers=headers)
+    response = requests.post(url, json=data)
 
     # Checking if the request was successful
     if response.status_code in (200, 201):  # 200 OK or 201 Created
@@ -1987,11 +1756,7 @@ def api_getCustomer_id(request,firstName,lastName,dob,phoneNumber,email):
 
         if response_data:
             # customer_id = str(response_data[0].get("customerId"))
-            # customer_id = response_data
-            # request.session['customer_id'] = response_data
-            request.session[f'customer_id_{tab_id}'] = response_data
-            # data['customer_id']= response_data
-            # data['user_id']= response_data
+            customer_id = response_data
         else:
             print("Details not found in Databse")
 
@@ -2001,90 +1766,6 @@ def api_getCustomer_id(request,firstName,lastName,dob,phoneNumber,email):
         print(f"Failed to send data. Status code: {response.status_code}")
         print("Response content:", response.text)
 
-def get_practice_token(practice) -> str:
-    """
-        Get authentication token using vendor and account credentials.
-    """
-    print("Get practice authentication token")
-    auth_url = "https://chatbotadmin.maximeyes.com:444/AuthenticateV2"
-
-    auth_payload = None
-
-    for val in practices_dictionary[f'{practice}']:
-        if val["vendorName"] == "Chatbot":
-            auth_payload = val
-        
-    headers = {'Content-Type': 'application/json'}
-    try:
-        auth_response = requests.post(auth_url, json=auth_payload, headers=headers)
-        auth_response.raise_for_status()
-        response_json = auth_response.json()
-
-        if response_json.get('isToken'):
-            print(response_json)
-            return response_json.get('token')
-        else:
-            return f"Error message: {response_json.get('ErrorMessage')}"
-    except requests.RequestException as e:
-        return f"Authentication failed: {str(e)}"
-    except json.JSONDecodeError:
-        return "Failed to decode JSON response"  
-
-# def get_practice_token(request) -> str:
-#     """
-#         Get authentication token using vendor and account credentials.
-#     """
-#     print("Get practice authentication token")
-#     auth_url = "https://chatbotadmin.maximeyes.com:444/AuthenticateV2"
-
-#     path_var = request.path
-#     print("0"*100)
-#     print(path_var)
-#     print("0"*100)
-
-#     if path_var == "/hheyecare/g7er" or path_var=="/hheyecare/3gs5" or path_var == "/practice/1":
-#         auth_payload = {
-#                         "VendorId": "e59ec838-2fc5-4639-b761-78e3ec55187b",
-#                         "VendorPassword": "password@1234",
-#                         "AccountId": "hheyecare",
-#                         "AccountPassword": "sJ0Y0oniZb6eoBMETuxUNy0aHf6tD6z3wynipZTDdvg="
-#                         }
-        
-#         print("0"*100)
-#         print(auth_payload)
-#         print("0"*100)
-
-#     elif path_var == "/sebia/sh6d" or path_var == "/practice/2":
-#         auth_payload = {
-#                             "VendorId": "e59ec838-2fc5-4639-b761-78e3ec55176c",
-#                             "VendorPassword": "password@1234",
-#                             "AccountId": "sebia",
-#                             "AccountPassword": "oHTHmGL+7tYhDLwP39IwdgOx7YG6Z5PDbzjfu4S5yhs="
-#                         }
-        
-#     else:
-#         auth_payload = {
-#                         "VendorId": "e59ec838-2fc5-4639-b761-78e3ec55187b",
-#                         "VendorPassword": "password@1234",
-#                         "AccountId": "hheyecare",
-#                         "AccountPassword": "sJ0Y0oniZb6eoBMETuxUNy0aHf6tD6z3wynipZTDdvg="
-#                         }
-        
-#     headers = {'Content-Type': 'application/json'}
-#     try:
-#         auth_response = requests.post(auth_url, json=auth_payload, headers=headers)
-#         auth_response.raise_for_status()
-#         response_json = auth_response.json()
-
-#         if response_json.get('isToken'):
-#             print(response_json)
-#             return response_json.get('token')
-#         else:
-#             return f"Error message: {response_json.get('ErrorMessage')}"
-#     except requests.RequestException as e:
-#         return f"Authentication failed: {str(e)}"
-#     except json.JSONDecodeError:
-#         return "Failed to decode JSON response"   
 
 ##################################################################################################################
 
@@ -2093,25 +1774,10 @@ def chatbot_view(request):
     if request.method == "POST":
         data = json.loads(request.body.decode('utf-8'))
         user_input = data.get('input', '')
-        # global session                 ############ cahnges
+        global session                 ############ cahnges
         session_id = data.get('session_id', '')
         session = session_id
         practice = data.get('practice', '')
-        token = data.get('token', '')
-        path_var = data.get("path",'')
-        practice = path_var
-        print("token=",token)
-
-        # customer_id = data.get('customer_id', '0')
-        # customer_id = request.session.get('customer_id', '0')
-        # user_id = data.get('user_id', '0')
-        # user_id = request.session.get('user_id', '0')
-
-        tab_id = data.get('tab_id', '')  # Capture the tab_id from the request
-        
-        # Use the tab_id to create or manage a fresh state for this tab
-        customer_id = request.session.get(f'customer_id_{tab_id}', '0')
-
         try:
             print('trying')
             request.session[f"step{session_id}"]
@@ -2119,12 +1785,9 @@ def chatbot_view(request):
             print('excepting')
             request.session[f"step{session_id}"]='start'
         history=get_chat_history( session_id)
-        try:
-            chat_recieved(user_input ,session_id , customer_id)          ############ changes
-            chat_history_api(path_var, token)                           ############ changes
-        
-        except Exception as e :
-            return JsonResponse({"response": f"history api calling :error is these {e}"})
+
+        chat_recieved(user_input ,session_id )          ############ changes
+        # chat_history_api()                           ############ changes
         
         user=UserProfile.objects.filter(session_id=session_id)  
         if not user:
@@ -2153,11 +1816,6 @@ def chatbot_view(request):
         )
        
         response=str(response)
-        try:
-            chat_sent(response ,session_id , customer_id )          ############ changes
-            chat_history_api(path_var , token)                           ############ changes
-        
-        except Exception as e :
-            return JsonResponse({"response": f"history api calling :error is these {e}"})
-        
+        chat_sent(response , session_id)             ############ changes
+        # chat_history_api()                           ############ changes
         return JsonResponse({"response": response})
